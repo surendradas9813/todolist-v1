@@ -5,6 +5,8 @@ const bodyParser = require("body-parser");
 // requiring mongoose for database
 const mongoose = require("mongoose");
 
+const _ = require("lodash");
+
 
 const app = express();
 
@@ -22,10 +24,7 @@ mongoose.connect("mongodb://localhost:27017/todolistDB", { useNewUrlParser: true
 
 // creating schema
 const itemsSchema = new mongoose.Schema({
-    name: {
-        type: String,
-        unique: true
-    }
+    name: String
 })
 
 // creating mongoose model
@@ -45,9 +44,15 @@ const item3 = new Item({
 
 const defaultItems = [item1, item2, item3];
 
+// schema for customList
+const listSchema = {
+    name: String,
+    items: [itemsSchema]
+};
 
+const List = mongoose.model("List", listSchema);
 
-
+let day;
 
 app.get("/", (req, res) => {
 
@@ -60,7 +65,7 @@ app.get("/", (req, res) => {
         month: "long"
     };
 
-    var day = today.toLocaleDateString("en-US", options);
+    day = today.toLocaleDateString("en-US", options);
 
     Item.find({}, (err, items) => {
         if (items.length === 0) {
@@ -86,25 +91,76 @@ app.get("/", (req, res) => {
 app.post("/", (req, res) => {
     let item = req.body.newItem;
 
+    let listName = req.body.btn
+
     const newItem = new Item({
         name: item
     });
 
-    newItem.save();
-    res.redirect("/");
+    if (listName === day) {
+        newItem.save();
+        res.redirect("/");
+    }
+    else {
+        List.findOne({ name: listName }, (err, foundList) => {
+            foundList.items.push(newItem);
+            foundList.save();
+            res.redirect("/" + listName);
+        });
+    }
+
+
 
 });
 
 
 app.post("/delete", (req, res) => {
-    const toDelete = req.body.checkbox;
+    const toDeleteId = req.body.checkbox;
+    const listName = req.body.listName;
 
-    Item.findByIdAndRemove(toDelete, (err) => {
+    if (listName === day) {
+        Item.findByIdAndRemove(toDeleteId, (err) => {
+            if (!err) {
+                console.log("Successfully Deleted check item!");
+                res.redirect("/");
+            }
+        })
+    }
+    else {
+        List.findOneAndUpdate({ name: listName }, { $pull: { items: { _id: toDeleteId } } }, (err, foundList) => {
+            if (!err) {
+                res.redirect("/" + listName);
+            }
+        })
+    }
+
+
+});
+
+// Express routing paramters (dynamic URL)
+app.get("/:variable1", (req, res) => {
+    const customeListName = _.capitalize(req.params.variable1);
+
+    List.findOne({ name: customeListName }, (err, foundList) => {
         if (!err) {
-            console.log("Successfully Deleted check item!");
-            res.redirect("/");
+            if (!foundList) {
+                const list = new List({
+                    name: customeListName,
+                    items: defaultItems
+                });
+                list.save((err, result) => {
+                    res.redirect("/" + customeListName);
+                });
+
+            }
+            else {
+                res.render("list", { listTitle: customeListName, listItems: foundList.items });
+            }
         }
     })
+
+
+
 });
 
 
