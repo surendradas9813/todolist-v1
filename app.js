@@ -68,7 +68,7 @@ app.get("/", (req, res) => {
     day = today.toLocaleDateString("en-US", options);
 
     Item.find({}, (err, items) => {
-        if (items.length === 0) {
+        if (undefined !== items && items.length === 0) {
             Item.insertMany(defaultItems, (err) => {
                 if (err) {
                     console.log();
@@ -164,6 +164,6 @@ app.get("/:variable1", (req, res) => {
 });
 
 
-app.listen(3000, () => {
+app.listen(process.env.PORT || 3000, () => {
     console.log("server is up and running on port 4000");
 });
